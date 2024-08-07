@@ -26,8 +26,6 @@ public class GeradorNFController {
 				return new ResponseEntity<>(HttpStatus.BAD_REQUEST);
 			}
 
-			// Exemplo de retorno
-			String mensagem = "Nota fiscal gerada com sucesso para o pedido: " + pedido.getIdPedido();
 			NotaFiscal notaFiscal = notaFiscalService.gerarNotaFiscal(pedido);
 			return new ResponseEntity<>(notaFiscal, HttpStatus.OK);
 

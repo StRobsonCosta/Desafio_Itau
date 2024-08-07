@@ -6,5 +6,6 @@ public enum Regiao {
     NORDESTE,
     CENTRO_OESTE,
     SUDESTE,
-    SUL
+    SUL,
+    DESCONHECIDA
 }

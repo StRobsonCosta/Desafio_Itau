@@ -138,8 +138,8 @@ class GeradorNotaFiscalServiceImplTest {
 
 	
 	 @Test
-	 void testGerarNotaFiscal() {
-	        // Given
+	 void shouldGenerateNotaFiscalForTipoPessoaFisicaWithRegimeTributacaoSimplesNacionalAndFreteCalculatedBasedOnRegion() {
+		 
 	        Pedido pedido = mock(Pedido.class);
 	        Destinatario destinatario = mock(Destinatario.class);
 
@@ -149,7 +149,7 @@ class GeradorNotaFiscalServiceImplTest {
 	        when(pedido.getValorTotalItens()).thenReturn(100.0);
 	        when(pedido.getItens()).thenReturn(listarItemMock());
 	        when(pedido.getValorFrete()).thenReturn(10.0);
-	        when(destinatario.getEnderecos()).thenReturn(listarEnderecoMock());
+	        when(destinatario.getEnderecos()).thenReturn(listarEnderecoMock(Regiao.SUDESTE));
 
 	        CalculadoraAliquota calculadoraAliquota = mock(CalculadoraAliquota.class);
 	        when(calculadoraAliquota.calcularAliquota(any(), anyDouble())).thenReturn(listarItemNotaFiscalMock(6.0, 50.0, 2));
@@ -162,26 +162,29 @@ class GeradorNotaFiscalServiceImplTest {
 
 	            assertNotNull(notaFiscal);
 	            assertEquals(100.0, notaFiscal.getValorTotalItens());
-	            assertEquals(10.0 * 1.048, notaFiscal.getValorFrete(), 0.001); // Valor esperado com base na região
+	            assertEquals(10.0 * 1.048, notaFiscal.getValorFrete(), 0.001);
 	            verify(estoqueService).enviarNotaFiscalParaBaixaEstoque(notaFiscal);
 	            verify(registroService).registrarNotaFiscal(notaFiscal);
 	            verify(entregaService).agendarEntrega(notaFiscal);
 	            verify(financeiroService).enviarNotaFiscalParaContasReceber(notaFiscal);
 	        }
 	    }
+	 
+	 @Test
+	 void shouldThrowExceptionWhenNoEntregaOrCobrancaEntregaFinalidadeIsFound() {
+	     List<Endereco> enderecos = listarEnderecoMockComFinalidadeDiferente();
+
+	     Double valorFrete = 10.0;
+
+	     Exception exception = assertThrows(IllegalArgumentException.class,
+	             () -> geradorNotaFiscalService.calcularFrete(enderecos, valorFrete));
+
+	     assertEquals("Região não encontrada", exception.getMessage());
+	 }
+
 
 	@Test
-	void testCalcularFrete() {
-		List<Endereco> enderecos = listarEnderecoMock();
-		Double valorFrete = 10.0;
-
-		Double valorFreteComPercentual = geradorNotaFiscalService.calcularFrete(enderecos, valorFrete);
-
-		assertEquals(10.0 * 1.048, valorFreteComPercentual);
-	}
-
-	@Test
-	void testCalcularFreteSemRegiao() {
+	void shouldThrowExceptionWhenNoRegiaoIsFoundDuringFreteCalculation() {
 		List<Endereco> enderecos = listarEnderecoMockVazio();
 		Double valorFrete = 10.0;
 
@@ -189,6 +192,82 @@ class GeradorNotaFiscalServiceImplTest {
 				() -> geradorNotaFiscalService.calcularFrete(enderecos, valorFrete));
 		assertEquals("Região não encontrada", exception.getMessage());
 	}
+	
+	@Test
+	void shouldCalculateFreteForRegiaoSudeste() {
+		List<Endereco> enderecos = listarEnderecoMock(Regiao.SUDESTE);
+		Double valorFrete = 10.0;
+
+		Double valorFreteComPercentual = geradorNotaFiscalService.calcularFrete(enderecos, valorFrete);
+
+		assertEquals(10.0 * 1.048, valorFreteComPercentual);
+	}
+	
+	@Test
+	void shouldCalculateFreteForRegiaoNorte() {
+	    List<Endereco> enderecos = listarEnderecoMock(Regiao.NORTE);
+	    Double valorFrete = 10.0;
+
+	    Double valorFreteComPercentual = geradorNotaFiscalService.calcularFrete(enderecos, valorFrete);
+
+	    assertEquals(10.0 * 1.08, valorFreteComPercentual);
+	}
+
+	@Test
+	void shouldCalculateFreteForRegiaoNordeste() {
+	    List<Endereco> enderecos = listarEnderecoMock(Regiao.NORDESTE);
+	    Double valorFrete = 10.0;
+
+	    Double valorFreteComPercentual = geradorNotaFiscalService.calcularFrete(enderecos, valorFrete);
+
+	    assertEquals(10.0 * 1.085, valorFreteComPercentual);
+	}
+
+	@Test
+	void shouldCalculateFreteForRegiaoCentroOeste() {
+	    List<Endereco> enderecos = listarEnderecoMock(Regiao.CENTRO_OESTE);
+	    Double valorFrete = 10.0;
+
+	    Double valorFreteComPercentual = geradorNotaFiscalService.calcularFrete(enderecos, valorFrete);
+
+	    assertEquals(10.0 * 1.07, valorFreteComPercentual);
+	}
+
+	@Test
+	void shouldCalculateFreteForRegiaoSul() {
+	    List<Endereco> enderecos = listarEnderecoMock(Regiao.SUL);
+	    Double valorFrete = 10.0;
+
+	    Double valorFreteComPercentual = geradorNotaFiscalService.calcularFrete(enderecos, valorFrete);
+
+	    assertEquals(10.0 * 1.06, valorFreteComPercentual);
+	}
+
+	@Test
+	void shouldThrowExceptionWhenEnderecoListIsNullDuringFreteCalculation() {
+	    List<Endereco> enderecos = null;
+	    Double valorFrete = 10.0;
+
+	    Exception exception = assertThrows(IllegalArgumentException.class,
+	            () -> geradorNotaFiscalService.calcularFrete(enderecos, valorFrete));
+	    assertEquals("A lista de endereços não pode ser nula", exception.getMessage());
+	}
+	
+	@Test
+	void shouldReturnOriginalFreteWhenRegiaoIsNotHandled() {
+	    Endereco endereco = new Endereco();
+	    endereco.setFinalidade(Finalidade.ENTREGA);
+	    endereco.setRegiao(Regiao.DESCONHECIDA);
+
+	    List<Endereco> enderecos = Arrays.asList(endereco);
+	    Double valorFrete = 10.0;
+
+	    Double valorFreteFinal = geradorNotaFiscalService.calcularFrete(enderecos, valorFrete);
+
+	    assertEquals(valorFrete, valorFreteFinal);
+	}
+
+
 
 	private List<Item> listarItemMock() {
 		Item itemMock = new Item();
@@ -200,9 +279,9 @@ class GeradorNotaFiscalServiceImplTest {
 		return itens;
 	}
 
-	private List<Endereco> listarEnderecoMock() {
+	private List<Endereco> listarEnderecoMock(Regiao regiao) {
 		Endereco enderecoMock = new Endereco();
-		enderecoMock.setRegiao(Regiao.SUDESTE);
+		enderecoMock.setRegiao(regiao);
 		enderecoMock.setFinalidade(Finalidade.ENTREGA);
 		enderecoMock.setCep("03105003");
 
@@ -214,6 +293,19 @@ class GeradorNotaFiscalServiceImplTest {
 
 		return Collections.singletonList(enderecoMock);
 	}
+	
+	private List<Endereco> listarEnderecoMockComFinalidadeDiferente() {
+	    Endereco endereco1 = new Endereco();
+	    endereco1.setFinalidade(null);
+	    endereco1.setRegiao(Regiao.SUDESTE);
+
+	    Endereco endereco2 = new Endereco();
+	    endereco2.setFinalidade(Finalidade.OUTROS);
+	    endereco2.setRegiao(Regiao.NORDESTE);
+
+	    return Arrays.asList(endereco1, endereco2);
+	}
+
 
 	private List<ItemNotaFiscal> listarItemNotaFiscalMock(Double valorTrib, Double valorUnit, Integer quant) {
 		ItemNotaFiscal itemNFMock = new ItemNotaFiscal();
