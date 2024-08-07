@@ -23,8 +23,5 @@ public class Item {
 	    @JsonProperty("quantidade")
 	    private int quantidade;
 
-
-
-
 }
 

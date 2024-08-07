@@ -2,6 +2,7 @@ package br.com.itau.geradornotafiscal.service.impl;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -37,7 +38,6 @@ public class GeradorNotaFiscalServiceImpl implements GeradorNotaFiscalService{
 
 	@Override
 	public NotaFiscal gerarNotaFiscal(Pedido pedido) {
-		long startTime = System.currentTimeMillis();
 
 		Destinatario destinatario = pedido.getDestinatario();
 		TipoPessoa tipoPessoa = destinatario.getTipoPessoa();
@@ -47,13 +47,7 @@ public class GeradorNotaFiscalServiceImpl implements GeradorNotaFiscalService{
 		CalculadoraAliquota calculadoraAliquota = CalculadoraAliquotaFactory.obterCalculadoraAliquota(tipoPessoa, regimeTributacao, valorTotalItens);
 		List<ItemNotaFiscal> itemNotaFiscalList = calculadoraAliquota.calcularAliquota(pedido.getItens(), 0.0);
 
-		long afterAliquotaTime = System.currentTimeMillis();
-		System.out.println("Tempo de cálculo das alíquotas: " + (afterAliquotaTime - startTime) + " ms");
-
 		Double valorFreteComPercentual = calcularFrete(destinatario.getEnderecos(), pedido.getValorFrete());
-
-		long afterFreteTime = System.currentTimeMillis();
-		System.out.println("Tempo de cálculo do frete: " + (afterFreteTime - afterAliquotaTime) + " ms");
 
 		NotaFiscal notaFiscal = NotaFiscal.builder()
 				.idNotaFiscal(UUID.randomUUID().toString())
@@ -64,19 +58,16 @@ public class GeradorNotaFiscalServiceImpl implements GeradorNotaFiscalService{
 				.destinatario(pedido.getDestinatario())
 				.build();
 
-		long afterNotaFiscalTime = System.currentTimeMillis();
-		System.out.println("Tempo de criação da nota fiscal: " + (afterNotaFiscalTime - afterFreteTime) + " ms");
-
 		enviarParaServicos(notaFiscal);
-
-		long afterFinalTime = System.currentTimeMillis();
-		System.out.println("Tempo total de processamento: " + (afterFinalTime - startTime) + " ms");
 
 		return notaFiscal;
 	}
 
-	private Double calcularFrete(List<Endereco> enderecos, Double valorFrete) {
-		Regiao regiao = enderecos.stream()
+	public Double calcularFrete(List<Endereco> enderecos, Double valorFrete) {
+		
+		Regiao regiao = Optional.ofNullable(enderecos)
+			    .orElseThrow(() -> new IllegalArgumentException("A lista de endereços não pode ser nula"))
+			    .stream()
 	            .filter(endereco -> endereco.getFinalidade() == Finalidade.ENTREGA || endereco.getFinalidade() == Finalidade.COBRANCA_ENTREGA)
 	            .map(Endereco::getRegiao)
 	            .findFirst()
@@ -96,7 +87,7 @@ public class GeradorNotaFiscalServiceImpl implements GeradorNotaFiscalService{
 		return valorFrete;
 	}
 
-	private void enviarParaServicos(NotaFiscal notaFiscal) {
+	public void enviarParaServicos(NotaFiscal notaFiscal) {
 		estoqueService.enviarNotaFiscalParaBaixaEstoque(notaFiscal);
         registroService.registrarNotaFiscal(notaFiscal);
         entregaService.agendarEntrega(notaFiscal);
